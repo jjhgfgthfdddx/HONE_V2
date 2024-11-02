@@ -1,6 +1,10 @@
 # https://github.com/odysseusmax/animated-lamp/blob/master/bot/database/database.py
 import motor.motor_asyncio
-from info import DATABASE_NAME, DATABASE_URI, IMDB, IMDB_TEMPLATE, MELCOW_NEW_USERS, P_TTI_SHOW_OFF, SINGLE_BUTTON, SPELL_CHECK_REPLY, PROTECT_CONTENT
+from motor.motor_asyncio import AsyncIOMotorClient
+from info import DATABASE_NAME, DATABASE_URI, IMDB, IS_SEND_MOVIE_UPDATE, IMDB_TEMPLATE, MELCOW_NEW_USERS, P_TTI_SHOW_OFF, SINGLE_BUTTON, SPELL_CHECK_REPLY, PROTECT_CONTENT
+
+client = AsyncIOMotorClient(DATABASE_URI)
+mydb = client[DATABASE_NAME]
 
 class Database:
     
@@ -9,7 +13,8 @@ class Database:
         self.db = self._client[database_name]
         self.col = self.db.users
         self.grp = self.db.groups
-
+        self.movies_update_channel = self.db.movies_update_channel
+        self.botcol = self.db.botcol
 
     def new_user(self, id, name):
         return dict(
@@ -20,7 +25,6 @@ class Database:
                 ban_reason="",
             ),
         )
-
 
     def new_group(self, id, title):
         return dict(
@@ -71,10 +75,11 @@ class Database:
     async def get_all_users(self):
         return self.col.find({})
     
-
     async def delete_user(self, user_id):
         await self.col.delete_many({'id': int(user_id)})
 
+    async def delete_chat(self, chat_id):
+        await self.grp.delete_many({'id': int(chat_id)})
 
     async def get_banned(self):
         users = self.col.find({'ban_status.is_banned': True})
@@ -82,18 +87,14 @@ class Database:
         b_chats = [chat['id'] async for chat in chats]
         b_users = [user['id'] async for user in users]
         return b_users, b_chats
-    
-
 
     async def add_chat(self, chat, title):
         chat = self.new_group(chat, title)
         await self.grp.insert_one(chat)
-    
 
     async def get_chat(self, chat):
         chat = await self.grp.find_one({'id':int(chat)})
         return False if not chat else chat.get('chat_status')
-    
 
     async def re_enable_chat(self, id):
         chat_status=dict(
@@ -104,8 +105,7 @@ class Database:
         
     async def update_settings(self, id, settings):
         await self.grp.update_one({'id': int(id)}, {'$set': {'settings': settings}})
-        
-    
+
     async def get_settings(self, id):
         default = {
             'button': SINGLE_BUTTON,
@@ -119,28 +119,46 @@ class Database:
         chat = await self.grp.find_one({'id':int(id)})
         if chat:
             return chat.get('settings', default)
-        return default
-    
+        return default    
 
     async def disable_chat(self, chat, reason="No Reason"):
         chat_status=dict(
             is_disabled=True,
             reason=reason,
             )
-        await self.grp.update_one({'id': int(chat)}, {'$set': {'chat_status': chat_status}})
-    
+        await self.grp.update_one({'id': int(chat)}, {'$set': {'chat_status': chat_status}})    
 
     async def total_chat_count(self):
         count = await self.grp.count_documents({})
         return count
-    
 
     async def get_all_chats(self):
         return self.grp.find({})
 
-
     async def get_db_size(self):
         return (await self.db.command("dbstats"))['dataSize']
 
+    async def get_send_movie_update_status(self, bot_id):
+        bot = await self.botcol.find_one({'id': bot_id})
+        if bot and bot.get('movie_update_feature'):
+            return bot['movie_update_feature']
+        else:
+            return IS_SEND_MOVIE_UPDATE
 
+    async def update_send_movie_update_status(self, bot_id, enable):
+        bot = await self.botcol.find_one({'id': int(bot_id)})
+        if bot:
+            await self.botcol.update_one({'id': int(bot_id)}, {'$set': {'movie_update_feature': enable}})
+        else:
+            await self.botcol.insert_one({'id': int(bot_id), 'movie_update_feature': enable})            
+
+    async def movies_update_channel_id(self , id=None):
+        if id is None:
+            myLinks = await self.movies_update_channel.find_one({})
+            if myLinks is not None:
+                return myLinks.get("id")
+            else:
+                return None
+        return await self.movies_update_channel.update_one({} , {'$set': {'id': id}} , upsert=True)
+        
 db = Database(DATABASE_URI, DATABASE_NAME)
