@@ -3,7 +3,7 @@ from info import ADMINS
 import re
 from database.users_chats_db import db
 
-@Client.on_message(filters.command('set_update') & filters.user(ADMINS))
+@Client.on_message(filters.command("set_update") & filters.user(ADMINS))
 async def set_muc_id(client, message):
     try:
         id = message.command[1]
