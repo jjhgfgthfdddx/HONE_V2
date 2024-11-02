@@ -39,8 +39,22 @@ YEARS = ["1900", "1991", "1992", "1993", "1994", "1995", "1996", "1997", "1998",
 async def give_filters(client, message):
     k = await global_filters(client, message)    
     if k == False:
-        await auto_filter(client, message)       
-
+        await auto_filter(client, message)  
+        
+async def pm_text(bot, message):
+    content = message.text
+    user = message.from_user.first_name
+    user_id = message.from_user.id
+    if content.startswith("/") or content.startswith("#"): return  # ignore commands and hashtags
+    await message.reply_text(
+         text=f"<b>Just type the movie name in the group. I can only work in groups\n\nഇവിടെ ചോദിച്ചാൽ സിനിമ കിട്ടില്ല ഗ്രൂപ്പിൽ മാത്രം സിനിമ ചോദിക്കുക\n\n ask in Group Link👇</b>",   
+         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("💥 𝗚𝗥𝗢𝗨𝗣 𝗟𝗜𝗡𝗞 💥", url=f"https://t.me/+bs3Dt4ytdbcwNzg1")]])
+    )
+    await bot.send_message(
+        chat_id=LOG_CHANNEL,
+        text=f"<b>#𝐏𝐌_𝐌𝐒𝐆\n\nNᴀᴍᴇ : {user}\n\nID : {user_id}\n\nMᴇssᴀɢᴇ : {content}</b>"
+    )
+    
 @Client.on_callback_query(filters.regex(r"^next"))
 async def next_page(bot, query):
     ident, req, key, offset = query.data.split("_")
